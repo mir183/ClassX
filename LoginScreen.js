@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from './firebaseConfig'; // Import Firebase auth from firebaseConfig.js
@@ -25,6 +25,7 @@ export default function LoginScreen({ navigation }) {
   const [emailError, setEmailError] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Email validation regex pattern
   const validateEmail = (text) => {
@@ -54,12 +55,34 @@ export default function LoginScreen({ navigation }) {
     }
 
     try {
+      // Set loading state (if you implement it)
+      setIsLoading(true); // You'll need to add this state
+      
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      alert('Login successful!');
+      
+      // Navigate directly without showing an alert
       navigation && navigation.navigate('Home', { userEmail: user.email });
     } catch (error) {
-      alert(error.message);
+      // Display user-friendly error messages
+      let errorMessage = 'An error occurred during login. Please try again.';
+      
+      if (error.code === 'auth/invalid-credential' || 
+          error.code === 'auth/wrong-password' ||
+          error.code === 'auth/user-not-found') {
+        errorMessage = 'Incorrect email or password. Please try again.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = 'This account has been disabled. Please contact support.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed login attempts. Please try again later.';
+      }
+      
+      alert(errorMessage);
+    } finally {
+      // Reset loading state (if you implement it)
+      setIsLoading(false); // You'll need to add this state
     }
   };
 
@@ -110,8 +133,19 @@ export default function LoginScreen({ navigation }) {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-          <Text style={styles.loginButtonText}>Login</Text>
+        <TouchableOpacity 
+          style={styles.loginButton} 
+          onPress={handleLogin} 
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={[styles.loginButtonText, {marginLeft: 8}]}>Logging in...</Text>
+            </View>
+          ) : (
+            <Text style={styles.loginButtonText}>Login</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.googleButton}>
@@ -208,6 +242,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   googleButton: {
     width: '100%',

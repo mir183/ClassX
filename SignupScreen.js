@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from './firebaseConfig'; // Import Firebase auth from firebaseConfig.js
@@ -30,6 +30,7 @@ export default function SignupScreen({ navigation }) {
   const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Email validation regex pattern
   const validateEmail = (text) => {
@@ -93,11 +94,31 @@ export default function SignupScreen({ navigation }) {
     }
 
     try {
+      // Set loading state
+      setIsLoading(true);
+      
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      alert('Signup successful!');
+      
+      // Navigate to login screen without showing an alert
       navigation && navigation.navigate('Login'); // Navigate to Login screen
     } catch (error) {
-      alert(error.message);
+      // Display user-friendly error messages
+      let errorMessage = 'An error occurred during signup. Please try again.';
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered. Please use a different email or try logging in.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Your password is too weak. Please choose a stronger password.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      }
+      
+      alert(errorMessage);
+    } finally {
+      // Reset loading state
+      setIsLoading(false);
     }
   };
 
@@ -208,8 +229,19 @@ export default function SignupScreen({ navigation }) {
             {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
           </View>
 
-          <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
-            <Text style={styles.signupButtonText}>Sign Up</Text>
+          <TouchableOpacity 
+            style={styles.signupButton} 
+            onPress={handleSignup}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={[styles.signupButtonText, {marginLeft: 8}]}>Signing up...</Text>
+              </View>
+            ) : (
+              <Text style={styles.signupButtonText}>Sign Up</Text>
+            )}
           </TouchableOpacity>
 
           <View style={styles.loginContainer}>
@@ -306,6 +338,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loginContainer: {
     flexDirection: 'row',
