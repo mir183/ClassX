@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Modal, TextInput, Alert, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Modal, TextInput, Alert, Animated, Easing, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Swipeable, GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 
@@ -25,14 +25,22 @@ export default function RoutineScreen() {
   const [editingTask, setEditingTask] = useState(null);
   const [editedTaskTitle, setEditedTaskTitle] = useState('');
   
-  // Animation values for calendar swipe
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  // Full screen width for swipe animations
+  const SCREEN_WIDTH = Dimensions.get('window').width;
+  // Animation values for calendar swipe (three-panel continuous)
+  const slideAnim = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
+  // Reset translation to center panel on offset change to avoid flicker and re-enable swiping
+  useEffect(() => {
+    slideAnim.setValue(-SCREEN_WIDTH);
+    // Allow further swipes after recentering
+    setIsAnimating(false);
+  }, [weekOffset, SCREEN_WIDTH]);
   const [isAnimating, setIsAnimating] = useState(false);
   const [tasks, setTasks] = useState([]);
   
   
-  // Generate week days based on current date and week offset
-  const getWeekDays = () => {
+  // Generate week days for a given offset (0 = current, -1=prev, +1=next)
+  const getWeekDays = (offset = weekOffset) => {
     // Get the current date
     const now = new Date();
     const realToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -42,8 +50,8 @@ export default function RoutineScreen() {
     // Adjust to first day (Sunday) of the week
     firstDayOfWeek.setDate(firstDayOfWeek.getDate() - firstDayOfWeek.getDay());
     
-    // Apply the week offset
-    firstDayOfWeek.setDate(firstDayOfWeek.getDate() + (weekOffset * 7));
+    // Apply the specified offset
+    firstDayOfWeek.setDate(firstDayOfWeek.getDate() + (offset * 7));
     
     // Create the array of days for the week
     const days = [];
@@ -95,6 +103,9 @@ export default function RoutineScreen() {
   const [animatingTaskId, setAnimatingTaskId] = useState(null);
   const taskAnimatedValues = useRef(new Map()).current;
   
+  // Standardized task row height for animations
+  const TASK_HEIGHT = 96;
+  
   // Get or create animated value for a task
   const getTaskAnimatedValue = (taskId) => {
     if (!taskAnimatedValues.has(taskId)) {
@@ -114,277 +125,101 @@ export default function RoutineScreen() {
   const toggleTaskCompletion = (taskId) => {
     const taskToUpdate = tasks.find(task => task.id === taskId);
     const newCompletedValue = !taskToUpdate.completed;
-    
-    // Get the animated values for this task
-    const animatedValues = getTaskAnimatedValue(taskId);
-    
-    if (newCompletedValue) {
-      // Task is being completed - animate it
-      setAnimatingTaskId(taskId);
-      
-      // Get the current task's index in filteredTasks
-      const currentTaskIndex = filteredTasks.findIndex(t => t.id === taskId);
-      
-      // Calculate the number of incomplete tasks below the current task
-      const tasksAbove = filteredTasks.filter((t, idx) => idx < currentTaskIndex && !t.completed).length;
-      const tasksBelow = filteredTasks.filter((t, idx) => idx > currentTaskIndex && !t.completed).length;
-      
-      // Each task is approximately 96px tall (80px + 16px margin)
-      const taskHeight = 96;
-      
-      // Calculate exact move distance based on position in the list
-      // This calculation ensures consistent animation regardless of task position
-      const moveDistance = tasksBelow * taskHeight;
-      
-      // Prepare animations for all tasks
-      const animations = [];
-      
-      // Configure a constant-speed animation with no acceleration/deceleration
-      // Adjust base duration based on position in the list
-      // Tasks at the bottom need slightly longer animations to prevent bounce
-      const duration = currentTaskIndex >= filteredTasks.length - 2 ? 500 : 450;
-      
-      const animationConfig = {
-        duration: duration,
-        useNativeDriver: true,
-        easing: Easing.linear // Linear easing is essential for no bounce
-      };
-      
-      // Make sure we're starting from a clean state
-      animatedValues.translateY.setValue(0);
-      
-      // Create explicit animation with fixed distance calculation
-      // Breaking it into smaller steps for tasks at bottom of list
-      if (currentTaskIndex >= filteredTasks.length - 2) {
-        // For tasks near the bottom, use a multi-step approach to prevent bounce
-        animations.push(
-          Animated.sequence([
-            // First move halfway with slower timing
-            Animated.timing(animatedValues.translateY, {
-              toValue: moveDistance / 2,
-              duration: 225,
-              useNativeDriver: true,
-              easing: Easing.linear
-            }),
-            // Then complete the movement
-            Animated.timing(animatedValues.translateY, {
-              toValue: moveDistance,
-              duration: 225,
-              useNativeDriver: true,
-              easing: Easing.linear
-            })
-          ])
-        );
-      } else {
-        // For tasks higher in the list, normal animation works fine
-        animations.push(
-          Animated.timing(animatedValues.translateY, {
-            toValue: moveDistance,
-            ...animationConfig
-          })
-        );
-      }
-      
-      // Simple opacity change without animation
-      animatedValues.opacity.setValue(0.85);
-      
-      // For each task that needs to move up (tasks after the completed one that aren't completed)
-      filteredTasks.forEach((task, index) => {
-        // Only animate incomplete tasks that are below the completed task
-        if (index > currentTaskIndex && !task.completed) {
-          const taskAnimValues = getTaskAnimatedValue(task.id);
-          
-          // Reset to ensure starting from 0
-          taskAnimValues.translateY.setValue(0);
-          
-          // Position-aware animation adjustment
-          // Tasks closer to the bottom need more careful animation
-          if (index >= filteredTasks.length - 2) {
-            animations.push(
-              Animated.timing(taskAnimValues.translateY, {
-                toValue: -taskHeight,
-                duration: 500, // Slightly longer duration for bottom tasks
-                useNativeDriver: true,
-                easing: Easing.linear
-              })
-            );
-          } else {
-            // For tasks higher up, normal animation works fine
-            animations.push(
-              Animated.timing(taskAnimValues.translateY, {
-                toValue: -taskHeight, // Move up by one task height
-                ...animationConfig
-              })
-            );
-          }
-        }
-      });
-      
-      // Run all animations in parallel with position-aware strategy
-      // The animations array now contains position-optimized animations
-      Animated.parallel(animations, { stopTogether: true }).start(() => {
-        // Update the actual data structures behind the scenes
-        const updatedTasks = tasks.map(task => {
-          if (task.id === taskId) {
-            return { ...task, completed: newCompletedValue };
-          }
-          return task;
-        });
-        
-        // Reset all animation values immediately and simultaneously
-        requestAnimationFrame(() => {
-          // Reset the completed task animation
-          animatedValues.translateY.setValue(0);
-          animatedValues.opacity.setValue(1);
-          
-          // Reset translate values for all other tasks
-          filteredTasks.forEach(task => {
-            if (task.id !== taskId) {
-              getTaskAnimatedValue(task.id).translateY.setValue(0);
-            }
-          });
-        });
-        
-        // Update state after animation completes
-        setTasks(updatedTasks);
-        setAnimatingTaskId(null);
-      });
-      
-      return; // We'll update the tasks after animation completes
-    } 
-    
-    // For toggling from completed to incomplete - implement reverse animation
-    // Set animating state
-    setAnimatingTaskId(taskId);
-    
-    console.log("UNCHECKING TASK ANIMATION STARTED");
-    
-    // Get current sorted task list
-    const sortedTasks = [...filteredTasks];
-    
-    // Find where the task currently is in the list (should be in the completed section)
-    const currentTaskIndex = sortedTasks.findIndex(t => t.id === taskId);
-    
-    // Find where it should go in the list - it should be at the end of the incomplete tasks section
-    const incompleteCount = sortedTasks.filter(t => !t.completed && t.id !== taskId).length;
-    
-    // Target index should be the position after all incomplete tasks
-    const targetIndex = incompleteCount;
-    
-    console.log(`Current task index: ${currentTaskIndex}, target index: ${targetIndex}`);
-    
-    // Constants for task height and animation parameters
-    const taskHeight = 96; // 80px for the task + 16px margin
-    
-    // Position-aware animation duration
-    const duration = currentTaskIndex >= filteredTasks.length - 2 ? 600 : 500;
-    
-    // Animation config with position-aware duration and improved easing
-    const animationConfig = {
-      duration: duration,
-      useNativeDriver: true,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1.0) // Smooth easing with no bounce
-    };
-    
-    // Calculate how far the task needs to move up
-    // For unchecking: this is the distance from current position to target position
-    // A negative value means moving up the list, positive means moving down
-    console.log(`Task should move from index ${currentTaskIndex} to index ${targetIndex}`);
-    const positionsToMove = targetIndex - currentTaskIndex;
-    const moveDistance = positionsToMove * taskHeight;
-    console.log(`Move distance calculated: ${moveDistance}px`);
-    
-    // Update state to mark the task as incomplete immediately
-    // This ensures the z-index is correct during animation
-    const updatedTasksList = tasks.map(task => {
+
+    // Prepare updated tasks but defer state update until after animation
+    const updatedTasks = tasks.map(task => {
       if (task.id === taskId) {
-        return { ...task, completed: false };
+        return { ...task, completed: newCompletedValue };
       }
       return task;
     });
-    setTasks(updatedTasksList);
-    
-    // Prepare animations array
-    const animations = [];
-    
-    // Reset vertical position to start clean
-    animatedValues.translateY.setValue(0);
-    
-    // Debug log to help diagnose animation issues
-    console.log(`Unchecking task at index ${currentTaskIndex}, moving to ${targetIndex}, distance: ${moveDistance}px`);
-    
-    // Make sure unchecked tasks have full opacity immediately
-    animatedValues.opacity.setValue(1);
-    
-    // Create a snapshot of the task list before the state update
-    // This ensures our animation calculations are based on the current layout
-    const taskSnapshot = [...filteredTasks];
-    
-    // Add a small delay before starting the animation to allow state update to apply
-    setTimeout(() => {
-      // For tasks near the bottom, handle them differently
-      if (currentTaskIndex >= taskSnapshot.length - 2) {
-        // For tasks near the bottom, use a simplified approach for more intuitive animation
-        Animated.timing(animatedValues.translateY, {
-          toValue: moveDistance,
-          duration: 400,
-          useNativeDriver: true,
-          easing: Easing.bezier(0.25, 0.1, 0.25, 1.0)
-        }).start(() => {
-          // Reset animation values after completion
-          requestAnimationFrame(() => {
-            console.log("RESETTING ANIMATION VALUES");
-            animatedValues.translateY.setValue(0);
-            setAnimatingTaskId(null);
+
+    // Get the animated values for this task
+    const animatedValues = getTaskAnimatedValue(taskId);
+
+    if (newCompletedValue) {
+        // Task is being completed - animate it first, then update state
+        setAnimatingTaskId(taskId);
+
+        // Get the current task's index in filteredTasks
+        const currentTaskIndex = filteredTasks.findIndex(t => t.id === taskId);
+
+        // Calculate how many tasks (both checked and unchecked) are below this one
+        const tasksBelowTotal = filteredTasks.length - currentTaskIndex - 1;
+
+        // Use standardized task height constant
+        const taskHeight = TASK_HEIGHT;
+
+        // Calculate exact move distance to slide this task to the bottom of the list
+        const moveDistance = tasksBelowTotal * taskHeight;
+
+        // Compute new sorted order after toggling
+        const newFiltered = updatedTasks
+          .filter(task => task.day === selectedDay && task.weekOffset === weekOffset)
+          .sort((a, b) => {
+            if (a.completed && !b.completed) return 1;
+            if (!a.completed && b.completed) return -1;
+            return 0;
           });
+        // Prepare animations to move each item from its old index to its new index
+        const animations = [];
+        const animationConfig = { duration: 500, useNativeDriver: true, easing: Easing.bezier(0.25, 0.1, 0.25, 1) };
+        filteredTasks.forEach((t, oldIdx) => {
+          const { translateY } = getTaskAnimatedValue(t.id);
+          const newIdx = newFiltered.findIndex(nt => nt.id === t.id);
+          const toValue = (newIdx - oldIdx) * taskHeight;
+          animations.push(Animated.timing(translateY, { toValue, ...animationConfig }));
         });
-      } else {
-        // For tasks higher in the list, use standard animation
-        Animated.timing(animatedValues.translateY, {
-          toValue: moveDistance,
-          duration: 400,
-          useNativeDriver: true,
-          easing: Easing.bezier(0.25, 0.1, 0.25, 1.0)
-        }).start(() => {
-          // Reset animation values after completion
+        // Run all animations together
+        Animated.parallel(animations, { stopTogether: true }).start(() => {
+          // Commit state update and reset animations
+          setTasks(updatedTasks);
           requestAnimationFrame(() => {
-            console.log("RESETTING ANIMATION VALUES");
-            animatedValues.translateY.setValue(0);
-            setAnimatingTaskId(null);
+            newFiltered.forEach(t => {
+              const vals = getTaskAnimatedValue(t.id);
+              vals.translateY.setValue(0);
+              vals.opacity.setValue(1);
+            });
           });
+          setAnimatingTaskId(null);
         });
-      }
-    }, 0); // Immediate execution is better with the snapshot
-    
-    // Animate tasks that need to move down (tasks that will be below our now uncompleted task)
-    filteredTasks.forEach((task, index) => {
-      // We need to move down any incomplete tasks between the target index and current index
-      // These are tasks that will need to make space for our unchecked task
-      if (index >= targetIndex && index < currentTaskIndex && !task.completed) {
-        const taskAnimValues = getTaskAnimatedValue(task.id);
-        
-        // Reset animation value before starting
-        taskAnimValues.translateY.setValue(0);
-        
-        // Move all affected tasks in a single smooth motion
-        Animated.timing(taskAnimValues.translateY, {
-          toValue: taskHeight,
-          duration: 400, // Same duration as main task for synchronization
-          useNativeDriver: true,
-          easing: Easing.bezier(0.25, 0.1, 0.25, 1.0)
-        }).start(() => {
-          // Reset after animation completes
+    } else {
+        // Task is being unchecked - animate back to new position
+        setAnimatingTaskId(taskId);
+        // Compute new order after unchecking
+        const newFiltered = updatedTasks
+          .filter(task => task.day === selectedDay && task.weekOffset === weekOffset)
+          .sort((a, b) => {
+            if (a.completed && !b.completed) return 1;
+            if (!a.completed && b.completed) return -1;
+            return 0;
+          });
+        // Prepare animations to move items from old to new index
+        const animationsUncheck = [];
+        const animConfig = { duration: 500, useNativeDriver: true, easing: Easing.bezier(0.25, 0.1, 0.25, 1) };
+        // Use standardized task height constant
+        const taskHeight = TASK_HEIGHT;
+        filteredTasks.forEach((t, oldIdx) => {
+          const { translateY } = getTaskAnimatedValue(t.id);
+          const newIdx = newFiltered.findIndex(nt => nt.id === t.id);
+          const toValue = (newIdx - oldIdx) * taskHeight;
+          animationsUncheck.push(
+            Animated.timing(translateY, { toValue, ...animConfig })
+          );
+        });
+        Animated.parallel(animationsUncheck, { stopTogether: true }).start(() => {
+          // Commit state and reset values
+          setTasks(updatedTasks);
           requestAnimationFrame(() => {
-            taskAnimValues.translateY.setValue(0);
+            newFiltered.forEach(t => {
+              const vals = getTaskAnimatedValue(t.id);
+              vals.translateY.setValue(0);
+              vals.opacity.setValue(1);
+            });
           });
+          setAnimatingTaskId(null);
         });
-        
-        console.log(`Moving task at index ${index} down to make room for unchecked task`);
-      }
-    });
-    
-    // No need for Animated.parallel anymore since we're using individual animation starts and completion callbacks
-    console.log("All animations triggered - completion callbacks will handle cleanup");
+    }
   };
   
   // Update task with new values
@@ -422,56 +257,29 @@ export default function RoutineScreen() {
   
   // Navigate to previous week with animation
   const goToPreviousWeek = () => {
-    if (isAnimating) return; // Prevent multiple animations at once
-    
+    if (isAnimating) return;
     setIsAnimating(true);
-    // Animate from center to right (positive)
-    slideAnim.setValue(0);
-    Animated.timing(slideAnim, {
-      toValue: 300, // Slide right
-      duration: 250,
+    // Slide container right to reveal previous week
+    Animated.spring(slideAnim, {
+      toValue: 0,
+      friction: 8,
       useNativeDriver: true,
     }).start(() => {
-      slideAnim.setValue(-300); // Jump to left side
-      // Update the actual week offset after animation completes
-      setWeekOffset(prevOffset => prevOffset - 1);
-      
-      // Animate back to center
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start(() => {
-        setIsAnimating(false);
-      });
+      setWeekOffset(offset => offset - 1);
     });
   };
   
   // Navigate to next week with animation
   const goToNextWeek = () => {
-    if (isAnimating) return; // Prevent multiple animations at once
-    
+    if (isAnimating) return;
     setIsAnimating(true);
-    // Animate from center to left (negative)
-    slideAnim.setValue(0);
-    Animated.timing(slideAnim, {
-      toValue: -300, // Slide left
-      duration: 250,
+    // Slide container left to reveal next week
+    Animated.spring(slideAnim, {
+      toValue: -SCREEN_WIDTH * 2,
+      friction: 8,
       useNativeDriver: true,
-      easing: Easing.out(Easing.cubic),
     }).start(() => {
-      slideAnim.setValue(300); // Jump to right side
-      // Update the actual week offset after animation completes
-      setWeekOffset(prevOffset => prevOffset + 1);
-      
-      // Animate back to center
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start(() => {
-        setIsAnimating(false);
-      });
+      setWeekOffset(offset => offset + 1);
     });
   };
   
@@ -502,8 +310,10 @@ export default function RoutineScreen() {
     });
   };
   
-  // Generate the weekdays whenever the week offset changes
-  const weekDays = getWeekDays();
+  // Generate previous, current, next weeks for contiguous swipe
+  const prevWeekDays = getWeekDays(weekOffset - 1);
+  const weekDays = getWeekDays(weekOffset);
+  const nextWeekDays = getWeekDays(weekOffset + 1);
   
   // Filter tasks for the selected day
   // We need to match both the day index and the week
@@ -542,76 +352,92 @@ export default function RoutineScreen() {
         </View>
 
         {/* Week calendar with swipe navigation */}
-        <View style={styles.weekCalendarContainer}>
+        <View style={[styles.weekCalendarContainer, { marginHorizontal: -16, overflow: 'hidden' }]}>  
           
           {/* Week days display with enhanced swipe gesture */}
           <PanGestureHandler
             onGestureEvent={({ nativeEvent }) => {
-              // Real-time tracking of swipe for visual feedback
               if (!isAnimating && nativeEvent.state === State.ACTIVE) {
-                slideAnim.setValue(nativeEvent.translationX / 3); // Divide by 3 to reduce the movement
+                // drag relative to center panel
+                slideAnim.setValue(-SCREEN_WIDTH + nativeEvent.translationX);
               }
             }}
             onHandlerStateChange={({ nativeEvent }) => {
-              // When swipe gesture ends
               if (nativeEvent.state === State.END) {
                 if (isAnimating) return;
-                
-                // Minimum swipe distance to trigger week change
                 const SWIPE_THRESHOLD = 50;
-                
-                if (nativeEvent.translationX > SWIPE_THRESHOLD && Math.abs(nativeEvent.velocityX) > 80) {
-                  // Swiped right with enough force - go to previous week
+                if (nativeEvent.translationX > SWIPE_THRESHOLD) {
                   goToPreviousWeek();
-                } 
-                else if (nativeEvent.translationX < -SWIPE_THRESHOLD && Math.abs(nativeEvent.velocityX) > 80) {
-                  // Swiped left with enough force - go to next week
+                } else if (nativeEvent.translationX < -SWIPE_THRESHOLD) {
                   goToNextWeek();
-                }
-                else {
-                  // Reset position if swipe wasn't strong enough
+                } else {
+                  // snap back to center
                   Animated.spring(slideAnim, {
-                    toValue: 0,
+                    toValue: -SCREEN_WIDTH,
                     useNativeDriver: true,
-                    friction: 5,
+                    friction: 12,
+                    tension: 80,
                   }).start();
                 }
               }
             }}
           >
-            <Animated.View 
+            <Animated.View
               style={[
-                styles.weekCalendar,
+                { width: SCREEN_WIDTH * 3, flexDirection: 'row' },
                 { transform: [{ translateX: slideAnim }] }
-              ]}>
-              <View style={styles.daysRow}>
-                {weekDays.map((day, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.dayContainer,
-                      selectedDay === index ? styles.selectedDayContainer : null,
-                    ]}
-                    onPress={() => setSelectedDay(index)}
-                  >
-                    <Text style={[styles.dayName, selectedDay === index ? styles.selectedDayText : null]}>
-                      {day.dayName}
-                    </Text>
-                    <View style={[
-                      styles.dateCircle,
-                      day.isToday ? styles.todayCircle : null,
-                      selectedDay === index ? styles.selectedDateCircle : null
-                    ]}>
-                      <Text style={[
-                        styles.dateNumber,
-                        day.isToday ? styles.todayNumber : null,
-                        selectedDay === index ? styles.selectedDateNumber : null
-                      ]}>
-                        {day.date}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+              ]}
+            >
+              {/* Previous Week */}
+              <View style={{ width: SCREEN_WIDTH }}>
+                <View style={styles.daysRow}>
+                  {prevWeekDays.map((day, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.dayContainer, i === selectedDay && styles.selectedDayContainer]}
+                      onPress={() => setSelectedDay(i)}
+                    >
+                      <Text style={[styles.dayName, i === selectedDay && styles.selectedDayText]}> {day.dayName} </Text>
+                      <View style={[styles.dateCircle, day.isToday && styles.todayCircle, i === selectedDay && styles.selectedDateCircle]}>
+                        <Text style={[styles.dateNumber, day.isToday && styles.todayNumber, i === selectedDay && styles.selectedDateNumber]}> {day.date} </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              {/* Current Week */}
+              <View style={{ width: SCREEN_WIDTH }}>
+                <View style={styles.daysRow}>
+                  {weekDays.map((day, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.dayContainer, i === selectedDay && styles.selectedDayContainer]}
+                      onPress={() => setSelectedDay(i)}
+                    >
+                      <Text style={[styles.dayName, i === selectedDay && styles.selectedDayText]}> {day.dayName} </Text>
+                      <View style={[styles.dateCircle, day.isToday && styles.todayCircle, i === selectedDay && styles.selectedDateCircle]}>
+                        <Text style={[styles.dateNumber, day.isToday && styles.todayNumber, i === selectedDay && styles.selectedDateNumber]}> {day.date} </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              {/* Next Week */}
+              <View style={{ width: SCREEN_WIDTH }}>
+                <View style={styles.daysRow}>
+                  {nextWeekDays.map((day, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.dayContainer, i === selectedDay && styles.selectedDayContainer]}
+                      onPress={() => setSelectedDay(i)}
+                    >
+                      <Text style={[styles.dayName, i === selectedDay && styles.selectedDayText]}> {day.dayName} </Text>
+                      <View style={[styles.dateCircle, day.isToday && styles.todayCircle, i === selectedDay && styles.selectedDateCircle]}>
+                        <Text style={[styles.dateNumber, day.isToday && styles.todayNumber, i === selectedDay && styles.selectedDateNumber]}> {day.date} </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             </Animated.View>
           </PanGestureHandler>
@@ -949,7 +775,7 @@ export default function RoutineScreen() {
                     returnKeyType="done"
                     onSubmitEditing={() => {
                       if (editedTaskTitle.trim() !== '') {
-                        updateTask(editingTask.id, { title: editedTaskTitle.trim() });
+                        updateTask(editingTask.id, { title: editedTaskTitle });
                         setTaskEditVisible(false);
                       }
                     }}
@@ -999,12 +825,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-    paddingTop: 20, // Reduced padding to move content up
-    marginTop: 0, // Removed margin to reduce gap
-    paddingRight: 5, // Add a little padding on the right for the menu button
+    marginTop: 0, // Remove extra gap at top
+    paddingTop: 20, // Reduce padding to move content up
+    // Horizontal padding inherited from container
   },
   todayText: {
-    fontSize: 28, // Increased to match the design
+    fontSize: 22, // Reduced slightly for better balance
     fontWeight: 'bold',
     color: '#000',
   },
@@ -1021,6 +847,7 @@ const styles = StyleSheet.create({
   },
   weekCalendar: {
     marginBottom: 5,
+    width: '100%',
   },
   weekNavigation: {
     flexDirection: 'row',
@@ -1051,15 +878,13 @@ const styles = StyleSheet.create({
   },
   daysRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     width: '100%',
   },
   dayContainer: {
+    flex: 1,
     alignItems: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 0,
     borderRadius: 20,
-    width: '13%', // Slightly less than 1/7th to account for any margins
   },
   selectedDayContainer: {
     backgroundColor: 'rgba(148, 108, 237, 0.2)', // Light purple background for the entire day container
