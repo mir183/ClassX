@@ -61,8 +61,7 @@ export default function LoginScreen({ navigation }) {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
-      // Navigate directly without showing an alert
-      navigation && navigation.navigate('Home', { userEmail: user.email });
+      // Navigation is handled by auth state listener in App.js
     } catch (error) {
       // Display user-friendly error messages
       let errorMessage = 'An error occurred during login. Please try again.';

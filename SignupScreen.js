@@ -99,8 +99,7 @@ export default function SignupScreen({ navigation }) {
       
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Navigate to login screen without showing an alert
-      navigation && navigation.navigate('Login'); // Navigate to Login screen
+      // Navigation is handled by auth state listener in App.js
     } catch (error) {
       // Display user-friendly error messages
       let errorMessage = 'An error occurred during signup. Please try again.';

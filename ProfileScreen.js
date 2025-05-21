@@ -19,11 +19,7 @@ export default function ProfileScreen({ route, navigation }) {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      // Navigate back to login screen
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }]
-      });
+      // Let App.js auth listener handle navigation back to Login
     } catch (error) {
       alert('Error logging out: ' + error.message);
     }
