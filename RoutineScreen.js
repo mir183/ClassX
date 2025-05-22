@@ -35,6 +35,31 @@ export default function RoutineScreen() {
     // Allow further swipes after recentering
     setIsAnimating(false);
   }, [weekOffset, SCREEN_WIDTH]);
+  
+  // Ensure all tasks have a background color and the blue checkmark
+  useEffect(() => {
+    // Add background colors and set consistent blue checkmark for all tasks
+    if (tasks.length > 0) {
+      const updatedTasks = tasks.map(task => {
+        const updates = {};
+        
+        if (!task.backgroundColor) {
+          updates.backgroundColor = getRandomBackgroundColor();
+        }
+        
+        // Always update to use the standard blue checkmark
+        updates.completionEmoji = getCompletionEmoji();
+        
+        return Object.keys(updates).length > 0 ? { ...task, ...updates } : task;
+      });
+      
+      // Only update if tasks actually changed
+      if (JSON.stringify(updatedTasks) !== JSON.stringify(tasks)) {
+        setTasks(updatedTasks);
+      }
+    }
+  }, []);
+  
   const [isAnimating, setIsAnimating] = useState(false);
   const [tasks, setTasks] = useState([]);
   
@@ -77,12 +102,27 @@ export default function RoutineScreen() {
   
   // Add a new task function
   const addNewTask = () => {
+    // Check if the selected date is in the past
+    const selectedDate = weekDays[selectedDay].fullDate;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to midnight
+    
+    // Prevent adding tasks for past dates
+    if (selectedDate < today) {
+      Alert.alert(
+        "Cannot Add Task",
+        "You can only add tasks for today, tomorrow, and future dates.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+    
     // Task name validation is now done before calling this function
     const newTask = {
       id: tasks.length + 1,
       title: newTaskTitle.trim(),
-      icon: 'create-outline', // Default icon
-      iconColor: getRandomColor(),
+      backgroundColor: getRandomBackgroundColor(), // Add random background color
+      completionEmoji: getCompletionEmoji(), // Random emoji for task completion
       day: selectedDay,
       weekOffset: weekOffset, // Store the current week offset
       date: weekDays[selectedDay].fullDate, // Store the full date
@@ -97,6 +137,25 @@ export default function RoutineScreen() {
   const getRandomColor = () => {
     const colors = ['#FF6B6B', '#4D96FF', '#6C5CE7', '#00A66C', '#FFA500', '#8A2BE2'];
     return colors[Math.floor(Math.random() * colors.length)];
+  };
+  
+  // Helper to generate random background colors for task cards from the specified palette
+  const getRandomBackgroundColor = () => {
+    const colors = [
+      '#FAD6F7', // Light Pink
+      '#FCD9B0', // Light Peach
+      '#FFE873', // Light Yellow
+      '#CFF3AE', // Light Green
+      '#CCE5FF', // Light Blue
+      '#CCF2EA', // Mint/Aqua
+      '#E1D7FF'  // Lavender
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+  
+  // Helper to get completion checkmark (always returns checkmark)
+  const getCompletionEmoji = () => {
+    return '✓'; // Simple checkmark (will be styled white via CSS)
   };
   
   // Animation value for task reordering
@@ -125,6 +184,26 @@ export default function RoutineScreen() {
   const toggleTaskCompletion = (taskId) => {
     const taskToUpdate = tasks.find(task => task.id === taskId);
     const newCompletedValue = !taskToUpdate.completed;
+    
+    // Check if attempting to complete a future task
+    if (newCompletedValue) {
+      const taskDate = new Date(taskToUpdate.date);
+      const today = new Date();
+      
+      // Set both dates to midnight for proper comparison
+      taskDate.setHours(0, 0, 0, 0); 
+      today.setHours(0, 0, 0, 0);
+      
+      // Prevent completing tasks for future dates (but allow today)
+      if (taskDate.getTime() > today.getTime()) {
+        Alert.alert(
+          "Cannot Complete Task",
+          "You can only complete tasks for today, yesterday, and past dates.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+    }
 
     // Prepare updated tasks but defer state update until after animation
     const updatedTasks = tasks.map(task => {
@@ -287,6 +366,14 @@ export default function RoutineScreen() {
   const goToCurrentWeek = () => {
     if (isAnimating) return;
     
+    // Skip animation if already on current week (weekOffset === 0)
+    if (weekOffset === 0) {
+      // Just set the selected day to today without any animation
+      const today = new Date();
+      setSelectedDay(today.getDay());
+      return;
+    }
+    
     setIsAnimating(true);
     // Animate a fade out and in
     Animated.timing(slideAnim, {
@@ -314,6 +401,9 @@ export default function RoutineScreen() {
   const prevWeekDays = getWeekDays(weekOffset - 1);
   const weekDays = getWeekDays(weekOffset);
   const nextWeekDays = getWeekDays(weekOffset + 1);
+  // Today's date at midnight and selected day's full date
+  const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+  const selectedFullDate = weekDays[selectedDay]?.fullDate;
   
   // Filter tasks for the selected day
   // We need to match both the day index and the week
@@ -343,7 +433,7 @@ export default function RoutineScreen() {
           {/* Today/This Week button positioned between date and menu icon */}
           <TouchableOpacity onPress={goToCurrentWeek} style={styles.todayButton}>
             <Text style={styles.todayButtonText}>
-              {weekOffset === 0 ? 'This Week' : 'Go to Today'}
+              {weekOffset === 0 ? 'This Week' : 'View Today'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuButton}>
@@ -398,8 +488,18 @@ export default function RoutineScreen() {
                       onPress={() => setSelectedDay(i)}
                     >
                       <Text style={[styles.dayName, i === selectedDay && styles.selectedDayText]}> {day.dayName} </Text>
-                      <View style={[styles.dateCircle, day.isToday && styles.todayCircle, i === selectedDay && styles.selectedDateCircle]}>
-                        <Text style={[styles.dateNumber, day.isToday && styles.todayNumber, i === selectedDay && styles.selectedDateNumber]}> {day.date} </Text>
+                      <View style={[
+                        styles.dateCircle,
+                        i === selectedDay
+                          ? styles.selectedDateCircle
+                          : (day.isToday ? styles.todayCircle : null)
+                      ]}>  
+                        <Text style={[
+                          styles.dateNumber,
+                          i === selectedDay
+                            ? styles.selectedDateNumber
+                            : (day.isToday ? styles.todayNumber : null)
+                        ]}> {day.date} </Text>
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -415,8 +515,16 @@ export default function RoutineScreen() {
                       onPress={() => setSelectedDay(i)}
                     >
                       <Text style={[styles.dayName, i === selectedDay && styles.selectedDayText]}> {day.dayName} </Text>
-                      <View style={[styles.dateCircle, day.isToday && styles.todayCircle, i === selectedDay && styles.selectedDateCircle]}>
-                        <Text style={[styles.dateNumber, day.isToday && styles.todayNumber, i === selectedDay && styles.selectedDateNumber]}> {day.date} </Text>
+                      <View style={[
+                        styles.dateCircle,
+                        i === selectedDay && styles.selectedDateCircle
+                      ]}>
+                        <Text style={[
+                          styles.dateNumber,
+                          i === selectedDay && styles.selectedDateNumber
+                        ]}>
+                          {day.date}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -432,8 +540,16 @@ export default function RoutineScreen() {
                       onPress={() => setSelectedDay(i)}
                     >
                       <Text style={[styles.dayName, i === selectedDay && styles.selectedDayText]}> {day.dayName} </Text>
-                      <View style={[styles.dateCircle, day.isToday && styles.todayCircle, i === selectedDay && styles.selectedDateCircle]}>
-                        <Text style={[styles.dateNumber, day.isToday && styles.todayNumber, i === selectedDay && styles.selectedDateNumber]}> {day.date} </Text>
+                      <View style={[
+                        styles.dateCircle,
+                        i === selectedDay && styles.selectedDateCircle
+                      ]}>
+                        <Text style={[
+                          styles.dateNumber,
+                          i === selectedDay && styles.selectedDateNumber
+                        ]}>
+                          {day.date}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -530,15 +646,13 @@ export default function RoutineScreen() {
                 >
                   <View style={[
                     styles.taskCard, 
+                    { backgroundColor: task.backgroundColor || '#FFE8CC' }, // Use task-specific background color or default
                     animatingTaskId === task.id && !task.completed && {
-                      backgroundColor: '#FFF0DB', // Slightly lighter background during unchecking
+                      backgroundColor: task.backgroundColor ? task.backgroundColor : '#FFF0DB', // Preserve task-specific background during animation
                       borderWidth: 1,
                       borderColor: '#FFD699', // Subtle border
                     }
                   ]}>
-                    <View style={styles.taskIconContainer} backgroundColor={task.iconColor}>
-                      <Ionicons name={task.icon} size={24} color="#FFF" />
-                    </View>
                     <View style={styles.taskDetails}>
                       {task.progress && (
                         <Text style={styles.taskProgress}>{task.progress}</Text>
@@ -560,7 +674,7 @@ export default function RoutineScreen() {
                       }}
                     >
                       {task.completed && (
-                        <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+                        <Text style={styles.completionEmoji}>✓</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -575,13 +689,15 @@ export default function RoutineScreen() {
           )}
         </ScrollView>
 
-        {/* Add Task Button */}
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={() => setModalVisible(true)}
-        >
-          <Ionicons name="add" size={32} color="#FFFFFF" />
-        </TouchableOpacity>
+        {/* Add Task Button (only for today or future dates) */}
+        {selectedFullDate >= todayMidnight && (
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => setModalVisible(true)}
+          >
+            <Ionicons name="add" size={32} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
 
         {/* New Task Modal */}
         <Modal
@@ -682,10 +798,6 @@ export default function RoutineScreen() {
                   </TouchableOpacity>
                 
                   <View style={styles.taskDetailHeader}>
-                    <View style={styles.taskDetailIconContainer} backgroundColor={selectedTask.iconColor}>
-                      <Ionicons name={selectedTask.icon} size={28} color="#FFF" />
-                    </View>
-                    
                     <View style={styles.taskDetailInfo}>
                       <Text style={styles.taskDetailTitle}>{selectedTask.title}</Text>
                     </View>
@@ -714,7 +826,7 @@ export default function RoutineScreen() {
                       activeOpacity={0.7}
                     >
                       {selectedTask.completed && (
-                        <Ionicons name="checkmark" size={22} color="#FFFFFF" />
+                        <Text style={styles.completionEmojiDetail}>✓</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -956,22 +1068,15 @@ const styles = StyleSheet.create({
   },
   taskCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFE8CC', // Light orange background
     borderRadius: 16,
     padding: 16,
+    paddingLeft: 24, // Increased left padding to replace the icon space
     marginBottom: 0, // Moved margin to taskContainer
     alignItems: 'center',
     minHeight: 80, // Ensure consistent height
     position: 'relative', // Important for z-index to work properly
   },
-  taskIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
+  // taskIconContainer style removed
   taskDetails: {
     flex: 1,
   },
@@ -992,21 +1097,37 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   checkCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: '#888',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 1,
+    paddingBottom: 1,
   },
   completedCheckCircle: {
     backgroundColor: '#4CAF50', // Green color for completed tasks
     borderColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   completedTaskTitle: {
     textDecorationLine: 'line-through',
     opacity: 0.7,
+  },
+  completionEmoji: {
+    fontSize: 18,
+    textAlign: 'center',
+    color: '#FFFFFF', // White color for the checkmark
+    fontWeight: 'bold',
+  },
+  completionEmojiDetail: {
+    fontSize: 20,
+    textAlign: 'center',
+    color: '#FFFFFF', // White color for the checkmark
+    fontWeight: 'bold',
   },
   addButton: {
     position: 'absolute',
@@ -1148,18 +1269,10 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     marginTop: 40, // Increased top margin to move everything further down
   },
-  taskDetailIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    marginTop: 12, // Increased to move icon down more
-  },
+  // taskDetailIconContainer style removed
   taskDetailInfo: {
     flex: 1,
-    paddingTop: 20, // Increased padding to move the title down more
+    paddingTop: 10, // Reduced padding since we no longer need to align with an icon
   },
   taskDetailTime: {
     fontSize: 14,
@@ -1176,7 +1289,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: '#4CAF50', // Green color to match task checkmarks 
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'transparent',

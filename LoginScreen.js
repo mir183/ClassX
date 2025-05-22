@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, ActivityIndicator } from 'react-native';
+// filepath: /Users/mirhossainahmed/ClassX/LoginScreen.js
+import React, { useState, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, ActivityIndicator, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from './firebaseConfig'; // Import Firebase auth from firebaseConfig.js
@@ -26,6 +27,9 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Create refs for input fields
+  const passwordRef = useRef(null);
 
   // Email validation regex pattern
   const validateEmail = (text) => {
@@ -87,78 +91,82 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.contentContainer}>
-        <View style={styles.header}>
-          <FlowerImage />
-          <Text style={styles.title}>ClassX</Text>
-          <Text style={styles.subtitle}>Login</Text>
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Email Address</Text>
-          <View style={[styles.inputWrapper, emailError ? styles.inputWrapperError : null]}>
-            <Ionicons name="mail-outline" size={24} color={emailError ? "#FF3B30" : "#6A3EA1"} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="andyj@gmail.com"
-              placeholderTextColor="#aaa"
-              value={email}
-              onChangeText={validateEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.contentContainer}>
+          <View style={styles.header}>
+            <FlowerImage />
+            <Text style={styles.title}>ClassX</Text>
+            <Text style={styles.subtitle}>Login</Text>
           </View>
-          {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
-          <Text style={styles.inputLabel}>Password</Text>
-          <View style={styles.inputWrapper}>
-            <Ionicons name="lock-closed-outline" size={24} color="#6A3EA1" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="********"
-              placeholderTextColor="#aaa"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-              <Ionicons
-                name={showPassword ? "eye-off-outline" : "eye-outline"}
-                size={24}
-                color="#6A3EA1"
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Email Address</Text>
+            <View style={[styles.inputWrapper, emailError ? styles.inputWrapperError : null]}>
+              <Ionicons name="mail-outline" size={24} color={emailError ? "#FF3B30" : "#6A3EA1"} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="andyj@gmail.com"
+                placeholderTextColor="#aaa"
+                value={email}
+                onChangeText={validateEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                onSubmitEditing={() => passwordRef.current.focus()}
+                returnKeyType="next"
               />
+            </View>
+            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+
+            <Text style={styles.inputLabel}>Password</Text>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed-outline" size={24} color="#6A3EA1" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="********"
+                placeholderTextColor="#aaa"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={24}
+                  color="#6A3EA1"
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <TouchableOpacity 
+            style={styles.loginButton} 
+            onPress={handleLogin} 
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={[styles.loginButtonText, {marginLeft: 8}]}>Logging in...</Text>
+              </View>
+            ) : (
+              <Text style={styles.loginButtonText}>Login</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.googleButton}>
+            <Ionicons name="logo-google" size={20} color="white" style={styles.googleIcon} />
+            <Text style={styles.googleButtonText}>Sign in with Google</Text>
+          </TouchableOpacity>
+
+          <View style={styles.signupContainer}>
+            <Text style={styles.signupText}>Don't have an account already? </Text>
+            <TouchableOpacity onPress={() => navigation && navigation.navigate('Signup')}>
+              <Text style={styles.signupLink}>Signup</Text>
             </TouchableOpacity>
           </View>
         </View>
-
-        <TouchableOpacity 
-          style={styles.loginButton} 
-          onPress={handleLogin} 
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#FFFFFF" />
-              <Text style={[styles.loginButtonText, {marginLeft: 8}]}>Logging in...</Text>
-            </View>
-          ) : (
-            <Text style={styles.loginButtonText}>Login</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.googleButton}>
-          <Ionicons name="logo-google" size={20} color="white" style={styles.googleIcon} />
-          <Text style={styles.googleButtonText}>Sign in with Google</Text>
-        </TouchableOpacity>
-
-        <View style={styles.signupContainer}>
-          <Text style={styles.signupText}>Don't have an account already? </Text>
-          <TouchableOpacity onPress={() => navigation && navigation.navigate('Signup')}>
-            <Text style={styles.signupLink}>Signup</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -167,6 +175,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 40  // Increased bottom padding for better spacing
   },
   contentContainer: {
     flex: 1,
@@ -269,6 +281,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 20  // Added bottom margin
   },
   signupText: {
     color: '#333',

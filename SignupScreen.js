@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
@@ -31,6 +31,12 @@ export default function SignupScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Create refs for input fields
+  const emailRef = useRef(null);
+  const phoneRef = useRef(null);
+  const passwordRef = useRef(null);
+  const confirmPasswordRef = useRef(null);
 
   // Email validation regex pattern
   const validateEmail = (text) => {
@@ -147,6 +153,8 @@ export default function SignupScreen({ navigation }) {
                 value={fullName}
                 onChangeText={setFullName}
                 autoCapitalize="words"
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current.focus()}
               />
             </View>
 
@@ -161,6 +169,9 @@ export default function SignupScreen({ navigation }) {
                 onChangeText={validateEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                ref={emailRef}
+                returnKeyType="next"
+                onSubmitEditing={() => phoneRef.current.focus()}
               />
             </View>
             {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
@@ -175,6 +186,9 @@ export default function SignupScreen({ navigation }) {
                 value={phoneNo}
                 onChangeText={setPhoneNo}
                 keyboardType="phone-pad"
+                ref={phoneRef}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current.focus()}
               />
             </View>
 
@@ -192,6 +206,9 @@ export default function SignupScreen({ navigation }) {
                 }}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
+                ref={passwordRef}
+                returnKeyType="next"
+                onSubmitEditing={() => confirmPasswordRef.current.focus()}
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                 <Ionicons
@@ -267,6 +284,7 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
+    paddingBottom: 40  // Increased bottom padding for better spacing
   },
   contentContainer: {
     flex: 1,
@@ -352,6 +370,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 20  // Added bottom margin
   },
   loginText: {
     color: '#333',

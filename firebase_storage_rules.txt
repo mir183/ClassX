@@ -1,0 +1,35 @@
+
+# Enhanced Firebase Storage rules for user profile images with better cross-device syncing:
+
+rules_version = "2";
+service firebase.storage {
+  match /b/{bucket}/o {
+    // User profile images with enhanced permissions
+    match /users/{userId}/{allPaths=**} {
+      // Anyone who is authenticated can read profile images
+      allow read: if request.auth != null;
+      
+      // Only the user can write their own profile images
+      allow write: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow metadata updates to existing files by the owner
+      allow update: if request.auth != null 
+                   && request.auth.uid == userId
+                   && (request.resource.size == resource.size || 
+                       request.resource.contentType == resource.contentType);
+    }
+    
+    // Special case for profile.jpg (fixed name used for compat)
+    match /users/{userId}/profile.jpg {
+      // More permissive rules for this specific file to ensure sync works
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Block access to all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

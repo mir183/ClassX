@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Image, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Image, Alert, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { auth } from './firebaseConfig';
-import { signOut, updateProfile } from "firebase/auth";
+import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth";
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { saveProfileImage, loadProfileImage, clearProfileImageCache } from './troubleshootStorage';
+
 
 export default function ProfileScreen({ route, navigation }) {
   const [userEmail, setUserEmail] = useState('');
@@ -11,29 +14,59 @@ export default function ProfileScreen({ route, navigation }) {
   const [profileImage, setProfileImage] = useState(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    // Get user email from route params or current auth state
-    if (route.params?.userEmail) {
-      setUserEmail(route.params.userEmail);
-    } else if (auth.currentUser) {
-      setUserEmail(auth.currentUser.email);
-      if (auth.currentUser.displayName) {
-        setUserName(auth.currentUser.displayName);
-        setNewName(auth.currentUser.displayName);
+    // Subscribe to auth state changes and load basic profile info
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        console.log('DEBUG: User ID:', user.uid);
+        console.log('DEBUG: User email:', user.email);
+        console.log('DEBUG: User displayName:', user.displayName);
+        
+        setUserEmail(user.email || '');
+        setUserName(user.displayName || 'Your Name');
+        setNewName(user.displayName || '');
+        
+        // Load profile image using the utility function
+        try {
+          const result = await loadProfileImage();
+          if (result.success) {
+            console.log(`DEBUG: Profile image loaded from ${result.source}`);
+            setProfileImage(result.imageUri);
+          } else {
+            console.log('DEBUG: No profile image found for user');
+          }
+        } catch (error) {
+          console.error('DEBUG: Error loading profile image:', error);
+        }
+      } else {
+        // User is logged out
+        console.log('DEBUG: User signed out - clearing profile data');
+        setUserEmail('');
+        setUserName('Your Name');
+        setNewName('');
+        setProfileImage(null);
       }
-      if (auth.currentUser.photoURL) {
-        setProfileImage(auth.currentUser.photoURL);
-      }
-    }
-  }, [route.params]);
+    });
+    
+    return unsubscribe;
+  }, []);
 
   const handleLogout = async () => {
     try {
+      // Clear cached profile image before logout using the utility function
+      await clearProfileImageCache();
+      console.log('DEBUG: Profile image cache cleared on logout');
+      
+      // Sign out from Firebase
       await signOut(auth);
+      console.log('DEBUG: User signed out successfully');
+      
       // Let App.js auth listener handle navigation back to Login
     } catch (error) {
-      alert('Error logging out: ' + error.message);
+      console.error('DEBUG: Error during logout:', error);
+      Alert.alert('Error', 'Error logging out: ' + error.message);
     }
   };
   
@@ -53,19 +86,48 @@ export default function ProfileScreen({ route, navigation }) {
         quality: 0.5,
       });
       
-      if (!result.canceled && result.assets) {
-        const selectedImage = result.assets[0].uri;
-        setProfileImage(selectedImage);
+      if (!result.canceled && result.assets && result.assets[0].uri) {
+        const localUri = result.assets[0].uri;
+        console.log('Image picked:', localUri);
         
-        // Update profile photo in Firebase
-        if (auth.currentUser) {
-          await updateProfile(auth.currentUser, {
-            photoURL: selectedImage
-          });
-        }
+        // Upload and cache the profile image
+        await uploadProfileImage(localUri);
       }
     } catch (error) {
+      console.error('Error picking image:', error);
       Alert.alert("Error", "An error occurred while picking the image: " + error.message);
+    }
+  };
+  
+  // Call this after selecting a profile image
+  const uploadProfileImage = async (uri) => {
+    if (!auth.currentUser) {
+      Alert.alert("Error", "You must be logged in to change your profile image");
+      return;
+    }
+    
+    setUploading(true);
+    
+    try {
+      console.log('DEBUG: Processing profile image:', uri);
+      
+      // Update local state immediately for better UX
+      setProfileImage(uri);
+      
+      // Save the profile image using the utility function
+      const result = await saveProfileImage(uri);
+      
+      if (result.success) {
+        Alert.alert('Success', 'Profile picture updated successfully!');
+      } else {
+        console.error('DEBUG: Error saving profile image:', result.error);
+        Alert.alert('Note', 'Your profile picture is saved on this device but might not sync to your account.');
+      }
+    } catch (error) {
+      console.error('ERROR in profile image update:', error);
+      Alert.alert("Error", `Could not update profile image: ${error.message || 'Unknown error'}`);
+    } finally {
+      setUploading(false);
     }
   };
   
@@ -98,9 +160,16 @@ export default function ProfileScreen({ route, navigation }) {
       
       <View style={styles.contentContainer}>
         {/* Profile Photo */}
-        <TouchableOpacity style={styles.photoContainer} onPress={pickImage}>
+        <TouchableOpacity style={styles.photoContainer} onPress={uploading ? null : pickImage}>
           {profileImage ? (
-            <Image source={{ uri: profileImage }} style={styles.profileImage} />
+            <>
+              <Image source={{ uri: profileImage }} style={styles.profileImage} />
+              {uploading && (
+                <View style={styles.uploadingOverlay}>
+                  <ActivityIndicator size="large" color="#6A3EA1" />
+                </View>
+              )}
+            </>
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
@@ -173,6 +242,17 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
   },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   avatarPlaceholder: {
     width: 120,
     height: 120,
@@ -227,7 +307,7 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 60,
+    marginBottom: 24,
   },
   logoutButton: {
     flexDirection: 'row',

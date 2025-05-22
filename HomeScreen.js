@@ -1,12 +1,9 @@
-// filepath: /Users/mirhossainahmed/ClassX/HomeScreen.js
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import RoutineScreen from './RoutineScreen';
-import InspireScreen from './InspireScreen';
-import ToolsScreen from './ToolsScreen';
 import ProfileScreen from './ProfileScreen';
+import RoutineScreen from './RoutineScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -28,20 +25,19 @@ export default function HomeScreen({ route, navigation }) {
           let iconName;
           
           if (route.name === 'Routine') {
+            // Return directly from here instead of setting iconName later
             return (
               <View style={focused ? styles.activeBlackCircleContainer : styles.blackCircleContainer}>
                 <Ionicons name="checkmark" size={20} color="#FFFFFF" />
               </View>
             );
-          } else if (route.name === 'Inspire') {
-            iconName = 'menu';
-          } else if (route.name === 'Tools') {
-            iconName = 'create';
           } else if (route.name === 'Profile') {
             iconName = 'person';
+            return <Ionicons name={iconName} size={size} color={focused ? '#000000' : '#AAAAAA'} />;
           }
-
-          return <Ionicons name={iconName} size={size} color={focused ? '#000000' : '#AAAAAA'} />;
+          
+          // Default case
+          return null;
         },
         tabBarActiveTintColor: '#000000',
         tabBarInactiveTintColor: '#AAAAAA',
@@ -64,24 +60,6 @@ export default function HomeScreen({ route, navigation }) {
         }}
       />
       <Tab.Screen 
-        name="Inspire" 
-        component={InspireScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <Ionicons name="menu" size={24} color={focused ? "#000000" : "#AAAAAA"} />
-          )
-        }}
-      />
-      <Tab.Screen 
-        name="Tools" 
-        component={ToolsScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <Ionicons name="create" size={24} color={focused ? "#000000" : "#AAAAAA"} />
-          )
-        }}
-      />
-      <Tab.Screen 
         name="Profile" 
         component={ProfileScreen} 
         initialParams={{ userEmail: userEmail }}
@@ -98,17 +76,17 @@ export default function HomeScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   blackCircleContainer: {
     backgroundColor: '#AAAAAA',
-    borderRadius: 20,
-    width: 36,
-    height: 36,
+    borderRadius: 15,
+    width: 30,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
   },
   activeBlackCircleContainer: {
     backgroundColor: '#000000',
-    borderRadius: 20,
-    width: 36,
-    height: 36,
+    borderRadius: 15,
+    width: 30,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
   },
