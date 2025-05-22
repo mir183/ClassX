@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth } from './firebaseConfig'; // Import Firebase auth from firebaseConfig.js
 
 // Custom logo component to display the logo without tinting
@@ -98,6 +98,11 @@ export default function SignupScreen({ navigation }) {
       setIsLoading(true);
       
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Update user profile with name
+      await updateProfile(userCredential.user, {
+        displayName: fullName
+      });
       
       // Navigation is handled by auth state listener in App.js
     } catch (error) {
