@@ -117,9 +117,7 @@ export default function ProfileScreen({ route, navigation }) {
       // Save the profile image using the utility function
       const result = await saveProfileImage(uri);
       
-      if (result.success) {
-        Alert.alert('Success', 'Profile picture updated successfully!');
-      } else {
+      if (!result.success) {
         console.error('DEBUG: Error saving profile image:', result.error);
         Alert.alert('Note', 'Your profile picture is saved on this device but might not sync to your account.');
       }

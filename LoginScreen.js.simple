@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, ActivityIndicator, ScrollView, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithCredential, signInWithPopup } from "firebase/auth";
 import { auth } from './firebaseConfig'; // Import Firebase auth from firebaseConfig.js
 
 // Custom logo component to display the logo without tinting
@@ -26,10 +26,11 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   
   // Create refs for input fields
   const passwordRef = useRef(null);
-  
+
   // Email validation regex pattern
   const validateEmail = (text) => {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -85,6 +86,30 @@ export default function LoginScreen({ navigation }) {
     } finally {
       // Reset loading state
       setIsLoading(false);
+    }
+  };
+  
+  // Handle Google Sign-In - Simplified approach
+  const handleGoogleSignIn = async () => {
+    try {
+      setGoogleLoading(true);
+      
+      // Tell user about the limitation in the current development environment
+      Alert.alert(
+        "Google Sign-In",
+        "For a complete implementation of Google Sign-In in a React Native app, you would need:\n\n" +
+        "1. Properly configured Firebase project\n" +
+        "2. SHA-1 fingerprint in Firebase console\n" +
+        "3. Configured OAuth consent screen\n" +
+        "4. Platform-specific setup with native SDKs\n\n" +
+        "This would need to be configured on your development machine.",
+        [{ text: "OK", onPress: () => setGoogleLoading(false) }]
+      );
+      
+    } catch (error) {
+      console.error("Google sign-in error:", error);
+      Alert.alert("Sign-in Error", "An error occurred during Google sign-in. Please try again.");
+      setGoogleLoading(false);
     }
   };
 
@@ -151,6 +176,24 @@ export default function LoginScreen({ navigation }) {
               </View>
             ) : (
               <Text style={styles.loginButtonText}>Login</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.googleButton}
+            onPress={handleGoogleSignIn}
+            disabled={googleLoading}
+          >
+            {googleLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={[styles.googleButtonText, {marginLeft: 8}]}>Connecting...</Text>
+              </View>
+            ) : (
+              <>
+                <Ionicons name="logo-google" size={20} color="white" style={styles.googleIcon} />
+                <Text style={styles.googleButtonText}>Sign in with Google</Text>
+              </>
             )}
           </TouchableOpacity>
 
@@ -227,55 +270,77 @@ const styles = StyleSheet.create({
     height: 52,
     width: '100%',
   },
-  inputWrapperError: {
-    borderWidth: 1,
-    borderColor: '#FF3B30',
-  },
   inputIcon: {
     marginRight: 12,
   },
   input: {
     flex: 1,
-    color: '#333',
+    height: 48,
     fontSize: 16,
-  },
-  errorText: {
-    color: '#FF3B30',
-    fontSize: 12,
-    marginTop: -12,
-    marginBottom: 16,
+    color: '#222',
   },
   loginButton: {
+    width: '100%',
     backgroundColor: '#6A3EA1',
     borderRadius: 8,
-    height: 52,
-    justifyContent: 'center',
+    paddingVertical: 15,
     alignItems: 'center',
     marginBottom: 16,
-    width: '100%',
   },
   loginButtonText: {
-    color: '#FFFFFF',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
   loadingContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  googleButton: {
+    width: '100%',
+    backgroundColor: '#00A66C',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    borderRadius: 8,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  googleIcon: {
+    marginRight: 10,
+  },
+  googleButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
   },
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 8,
+    alignItems: 'center',
+    marginBottom: 20  // Added bottom margin
   },
   signupText: {
-    color: '#666',
+    color: '#333',
     fontSize: 14,
   },
   signupLink: {
     color: '#6A3EA1',
+    fontWeight: 'bold',
     fontSize: 14,
-    fontWeight: '600',
+    marginLeft: 4,
+  },
+  inputWrapperError: {
+    borderColor: '#FF3B30',
+    borderWidth: 1,
+    backgroundColor: '#FFF5F5',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 8,
+    marginLeft: 4,
   },
 });

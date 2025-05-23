@@ -142,13 +142,58 @@ export default function RoutineScreen() {
   // Helper to generate random background colors for task cards from the specified palette
   const getRandomBackgroundColor = () => {
     const colors = [
+      // Original colors
       '#FAD6F7', // Light Pink
       '#FCD9B0', // Light Peach
       '#FFE873', // Light Yellow
       '#CFF3AE', // Light Green
       '#CCE5FF', // Light Blue
       '#CCF2EA', // Mint/Aqua
-      '#E1D7FF'  // Lavender
+      '#E1D7FF', // Lavender
+      
+      // New expanded color palette
+      '#B5EAD7', // Mint Green
+      '#D4F1F4', // Light Cyan
+      '#EAD7D1', // Pale Pink
+      '#CDEDF6', // Baby Blue
+      '#D1CFE2', // Lavender Gray
+      '#FFDAC1', // Peach
+      '#E3FDFD', // Light Turquoise
+      '#FFB7B2', // Light Coral
+      '#FFE0AC', // Light Orange
+      '#FAD6A5', // Light Tan
+      '#F9F3DF', // Light Cream
+      '#E0BBE4', // Light Purple
+      '#E3DFFD', // Periwinkle
+      '#B2F7EF', // Bright Mint
+      '#DAD4EF', // Lilac
+      '#FFF1F3', // Light Rose
+      '#D1F2EB', // Aquamarine
+      '#D5AAFF', // Bright Lavender
+      '#FFFAE3', // Cream
+      '#F2E8CF', // Pale Yellow
+      '#AED9E0', // Sky Blue
+      '#D6E4FF', // Pastel Blue
+      '#FFD1DC', // Pink
+      '#C8E6C9', // Light Green
+      '#FFF5BA', // Pale Yellow
+      '#F6C6EA', // Bubble Gum
+      '#FFDFD3', // Pale Peach
+      '#CAF7E3', // Mint
+      '#D2F6C5', // Lime
+      '#EDE7B1', // Pale Yellow
+      '#FFDEFA', // Light Pink
+      '#E0C3FC', // Light Purple
+      '#D0F0C0', // Light Lime
+      '#C7CEEA', // Periwinkle Blue
+      '#C1F0F6', // Sky Blue
+      '#E2F0CB', // Pale Green
+      '#FEE9E1', // Pale Peach
+      '#C4FAF8', // Light Aqua
+      '#F6F0ED', // Pale Gray
+      '#DFD3C3', // Light Taupe
+      '#F9F1F0', // Off White
+      '#FFF3E1'  // Light Beige
     ];
     return colors[Math.floor(Math.random() * colors.length)];
   };
@@ -362,18 +407,25 @@ export default function RoutineScreen() {
     });
   };
   
-  // Navigate to current week
+  // Navigate to current week and today's date
   const goToCurrentWeek = () => {
     if (isAnimating) return;
     
-    // Skip animation if already on current week (weekOffset === 0)
-    if (weekOffset === 0) {
-      // Just set the selected day to today without any animation
-      const today = new Date();
-      setSelectedDay(today.getDay());
+    const today = new Date();
+    const todayDay = today.getDay();
+    
+    // Skip animation if already on today's date (both current week and today's day)
+    if (weekOffset === 0 && selectedDay === todayDay) {
       return;
     }
     
+    // If we're already on the current week, just change the selected day
+    if (weekOffset === 0) {
+      setSelectedDay(todayDay);
+      return;
+    }
+    
+    // Otherwise, animate to current week and set today as selected day
     setIsAnimating(true);
     // Animate a fade out and in
     Animated.timing(slideAnim, {
@@ -383,8 +435,7 @@ export default function RoutineScreen() {
     }).start(() => {
       setWeekOffset(0);
       // Also set the selected day to today
-      const today = new Date();
-      setSelectedDay(today.getDay());
+      setSelectedDay(todayDay);
       
       slideAnim.setValue(100);
       Animated.timing(slideAnim, {
@@ -425,20 +476,44 @@ export default function RoutineScreen() {
         <View style={styles.header}>
           <View style={{flex: 1, flexDirection: 'row', alignItems: 'center'}}>
             <Text style={styles.todayText} numberOfLines={1}>
-              {/* Show the date in the format "20 May 2025" with full month name */}
-              {`${weekDays[selectedDay]?.date} ${new Date(weekDays[selectedDay]?.fullDate).toLocaleDateString('en-US', {month: 'long'})} ${new Date(weekDays[selectedDay]?.fullDate).getFullYear()}`}
+              {/* Show Today, Tomorrow, Yesterday or the full date */}
+              {(() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                
+                const selectedFullDate = weekDays[selectedDay]?.fullDate;
+                
+                if (selectedFullDate.toDateString() === today.toDateString()) {
+                  return "Today";
+                } else if (selectedFullDate.toDateString() === tomorrow.toDateString()) {
+                  return "Tomorrow";
+                } else if (selectedFullDate.toDateString() === yesterday.toDateString()) {
+                  return "Yesterday";
+                } else {
+                  return `${weekDays[selectedDay]?.date} ${new Date(selectedFullDate).toLocaleDateString('en-US', {month: 'long'})} ${new Date(selectedFullDate).getFullYear()}`;
+                }
+              })()}
             </Text>
           </View>
 
-          {/* Today/This Week button positioned between date and menu icon */}
+          {/* Today/This Week button positioned more to the right */}
           <TouchableOpacity onPress={goToCurrentWeek} style={styles.todayButton}>
             <Text style={styles.todayButtonText}>
-              {weekOffset === 0 ? 'This Week' : 'View Today'}
+              {(() => {
+                const today = new Date();
+                const todayDay = today.getDay();
+                const isViewingToday = weekOffset === 0 && selectedDay === todayDay;
+                return isViewingToday ? 'This Week' : 'View Today';
+              })()}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuButton}>
-            <Ionicons name="ellipsis-vertical" size={24} color="#000" />
-          </TouchableOpacity>
+          {/* Removed the 3-dot menu icon */}
         </View>
 
         {/* Week calendar with swipe navigation */}
@@ -563,15 +638,44 @@ export default function RoutineScreen() {
         <View style={styles.taskSectionHeader}>
           <Text style={styles.taskSectionHeaderText}>
             {(() => {
-              // Check if selected day is today
+              // Check for today, tomorrow, yesterday
               const today = new Date();
-              const isSelectedDayToday = weekDays[selectedDay]?.fullDate.toDateString() === today.toDateString();
-              const selectedDate = `${weekDays[selectedDay]?.date} ${new Date(weekDays[selectedDay]?.fullDate).toLocaleDateString('en-US', {month: 'long'})}`;
+              today.setHours(0, 0, 0, 0);
+              
+              const tomorrow = new Date(today);
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              
+              const yesterday = new Date(today);
+              yesterday.setDate(yesterday.getDate() - 1);
+              
+              const selectedFullDate = weekDays[selectedDay]?.fullDate;
+              let dateText = "";
+              let isPastDate = false;
+              
+              if (selectedFullDate.toDateString() === today.toDateString()) {
+                dateText = "Today";
+              } else if (selectedFullDate.toDateString() === tomorrow.toDateString()) {
+                dateText = "Tomorrow";
+              } else if (selectedFullDate.toDateString() === yesterday.toDateString()) {
+                dateText = "Yesterday";
+              } else {
+                // Check if it's a past date (before yesterday)
+                isPastDate = selectedFullDate < yesterday;
+                const monthShort = new Date(selectedFullDate).toLocaleDateString('en-US', {month: 'short'});
+                dateText = `${weekDays[selectedDay]?.date} ${monthShort}`;
+              }
               
               if (filteredTasks.length > 0) {
-                return `${filteredTasks.length} Task${filteredTasks.length !== 1 ? 's' : ''} ${isSelectedDayToday ? 'for Today' : `for ${selectedDate}`}`;
+                if (isPastDate) {
+                  return `${filteredTasks.length} Task${filteredTasks.length !== 1 ? 's' : ''} was on ${dateText}`;
+                } else {
+                  return `${filteredTasks.length} Task${filteredTasks.length !== 1 ? 's' : ''} for ${dateText}`;
+                }
               } else {
-                return isSelectedDayToday ? "Today's Tasks" : `Tasks for ${selectedDate}`;
+                return dateText === "Today" ? "Today's Tasks" : 
+                       dateText === "Tomorrow" ? "Tomorrow's Tasks" : 
+                       dateText === "Yesterday" ? "Yesterday's Tasks" : 
+                       isPastDate ? `Tasks was on ${dateText}` : `Tasks for ${dateText}`;
               }
             })()}
           </Text>
@@ -595,10 +699,8 @@ export default function RoutineScreen() {
                     ? (task.completed ? -1 : 50)  
                     : (task.completed ? 0 : 10),
                   
-                  // For Android, use elevation with the same logic as z-index
-                  elevation: animatingTaskId === task.id 
-                    ? (task.completed ? 0 : 10)
-                    : (task.completed ? 0 : 3),
+                  // For Android, use flat elevation to prevent shadows
+                  elevation: 0,
                   
                   // Apply transforms for all tasks
                   transform: [{ 
@@ -608,11 +710,11 @@ export default function RoutineScreen() {
                   // Adjust opacity based on completion status but maintain full opacity during animation
                   opacity: animatingTaskId === task.id ? 1 : (task.completed ? 0.85 : 1),
                   
-                  // Add subtle shadow for better visibility during animation
-                  shadowColor: animatingTaskId === task.id && !task.completed ? "#000" : "transparent",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: animatingTaskId === task.id && !task.completed ? 0.3 : 0,
-                  shadowRadius: 4,
+                  // No shadows during animation to prevent the border/shadow effect
+                  shadowColor: "transparent",
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0,
+                  shadowRadius: 0,
                 }
               ]}
             >
@@ -638,19 +740,26 @@ export default function RoutineScreen() {
                 overshootRight={false}
               >
                 <TouchableOpacity 
-                  activeOpacity={0.8}
+                  activeOpacity={0.9} // Higher value to minimize opacity change
                   onPress={() => {
                     setSelectedTask(task);
                     setTaskDetailVisible(true);
                   }}
+                  style={{ 
+                    shadowOpacity: 0, 
+                    shadowRadius: 0,
+                    elevation: 0
+                  }}
                 >
                   <View style={[
                     styles.taskCard, 
-                    { backgroundColor: task.backgroundColor || '#FFE8CC' }, // Use task-specific background color or default
-                    animatingTaskId === task.id && !task.completed && {
-                      backgroundColor: task.backgroundColor ? task.backgroundColor : '#FFF0DB', // Preserve task-specific background during animation
-                      borderWidth: 1,
-                      borderColor: '#FFD699', // Subtle border
+                    { backgroundColor: task.backgroundColor || '#FFE8CC' },
+                    // Explicitly disable any borders or shadows that might appear on interaction
+                    { 
+                      borderWidth: 0,
+                      shadowOpacity: 0,
+                      shadowRadius: 0,
+                      elevation: 0
                     }
                   ]}>
                     <View style={styles.taskDetails}>
@@ -672,6 +781,7 @@ export default function RoutineScreen() {
                         e.stopPropagation(); // Prevent triggering the parent's onPress
                         toggleTaskCompletion(task.id);
                       }}
+                      activeOpacity={1} // Prevent opacity change when pressed
                     >
                       {task.completed && (
                         <Text style={styles.completionEmoji}>✓</Text>
@@ -975,7 +1085,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(148, 108, 237, 0.2)',
     paddingVertical: 6,
     paddingHorizontal: 16, // Increased horizontal padding
-    marginRight: 10, // Slightly increased spacing
+    marginLeft: 'auto', // Push button to the right side
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1065,6 +1175,13 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginBottom: 16, // Same as taskCard marginBottom
     backfaceVisibility: 'hidden', // Prevent any rendering artifacts
+    
+    // Ensure no shadows are applied to the container
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
   },
   taskCard: {
     flexDirection: 'row',
@@ -1097,28 +1214,51 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   checkCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 29,
+    height: 29,
+    borderRadius: 15,
     borderWidth: 2,
     borderColor: '#888',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 1,
     paddingBottom: 1,
+    backgroundColor: 'transparent', // Ensure background is transparent
+    
+    // Completely disable all shadow effects on iOS
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    
+    // Disable elevation on Android
+    elevation: 0,
+    
+    // Prevent any highlight effect when pressed
+    overflow: 'hidden',
+    
+    // Add a solid color behind the circle to prevent any transparency issues
+    backfaceVisibility: 'hidden',
   },
   completedCheckCircle: {
     backgroundColor: '#4CAF50', // Green color for completed tasks
     borderColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
+    
+    // Explicitly disable any shadow effects that might appear
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
   },
   completedTaskTitle: {
     textDecorationLine: 'line-through',
     opacity: 0.7,
   },
   completionEmoji: {
-    fontSize: 18,
+    fontSize: 14,
     textAlign: 'center',
     color: '#FFFFFF', // White color for the checkmark
     fontWeight: 'bold',
@@ -1285,9 +1425,9 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   taskDetailCheckCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 29,
+    height: 29,
+    borderRadius: 15,
     borderWidth: 2,
     borderColor: '#4CAF50', // Green color to match task checkmarks 
     justifyContent: 'center',
