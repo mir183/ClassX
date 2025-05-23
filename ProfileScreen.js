@@ -5,7 +5,7 @@ import { auth } from './firebaseConfig';
 import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth";
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { saveProfileImage, loadProfileImage, clearProfileImageCache } from './troubleshootStorage';
+import { saveProfileImage, loadProfileImage, clearProfileImageCache } from './ProfileImageManager';
 
 
 export default function ProfileScreen({ route, navigation }) {
